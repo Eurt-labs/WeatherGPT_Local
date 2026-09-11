@@ -366,6 +366,24 @@
       </div>
 
       <div class="sidebar-section">
+        <span class="sidebar-title">User Profile Details</span>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <span class="input-label">User Name</span>
+            <input type="text" id="userNameInput" class="text-input" value="Dhruv">
+          </div>
+          <div>
+            <span class="input-label">Farm / Land</span>
+            <input type="text" id="userAreaInput" class="text-input" value="5 Acres">
+          </div>
+        </div>
+        <div>
+          <span class="input-label">Primary Crops (for Kisan AI)</span>
+          <input type="text" id="userCropsInput" class="text-input" value="Wheat, Mustard">
+        </div>
+      </div>
+
+      <div class="sidebar-section">
         <span class="sidebar-title">Weather Simulation</span>
         <div>
           <span class="input-label">Test Location</span>
@@ -503,7 +521,12 @@
       if (!text) return;
 
       const location = document.getElementById('locationInput').value.trim() || "New Delhi, India";
-      const weatherContext = document.getElementById('weatherSummaryInput').value.trim();
+      const baseWeather = document.getElementById('weatherSummaryInput').value.trim();
+      const userName = document.getElementById('userNameInput')?.value.trim() || "Dhruv";
+      const userArea = document.getElementById('userAreaInput')?.value.trim() || "5 Acres";
+      const userCrops = document.getElementById('userCropsInput')?.value.trim() || "Wheat, Mustard";
+
+      const weatherContext = `${baseWeather}\n\nUSER PROFILE (COLLECTED DETAILS):\nName: ${userName} | Sector: ${activeSector} | Primary Crops: ${userCrops} | Farm Area: ${userArea} | Region: ${location}`;
 
       // Append User message
       appendMessage('user', text);

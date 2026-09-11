@@ -192,6 +192,9 @@ def main():
 
     current_sector = "farmer"
     current_location = "New Delhi, India"
+    user_name = "Dhruv"
+    user_crops = "Wheat, Mustard"
+    user_land_area = "5 Acres"
     current_weather = "Live Atmosphere: 29.5 deg C (Humidity: 68%, Dew Point: 22.0 deg C, Pressure: 1012 hPa, Wind: 14 km/h)\nPrecipitation Outlook: 24h Rain: 0.0 mm | Rain Chance: 10%\nAgriculture & Soil: Topsoil Moisture: 0.33 m3/m3 | Evapotranspiration (ET0): 4.2 mm/day"
 
     print("[*] Contacting Open-Meteo for live telemetry...")
@@ -213,7 +216,8 @@ def main():
     print("  /fetch [city]                                       - Fetch live Open-Meteo data for any city")
     print("  /sector [farmer|disaster|commuter|aviation|general]  - Change role")
     print("  /weather [description]                              - Manually override weather")
-    print("  /location [city/state]                              - Change location")
+    print("  /location [city/state]                              - Change location
+  /profile [name, crops, area]                        - Set profile (e.g. /profile Dhruv | Wheat, Mustard | 5 Acres)")
     print("  /clear                                              - Clear conversation")
     print("  /exit                                               - Quit chat")
     print("=" * 70 + "\n")
@@ -284,6 +288,18 @@ def main():
                 print(f"Current weather: {current_weather}\n")
             continue
 
+                if cmd.startswith("/profile"):
+            parts = prompt.split(maxsplit=1)
+            if len(parts) > 1:
+                items = [x.strip() for x in parts[1].split("|")]
+                if len(items) >= 1 and items[0]: user_name = items[0]
+                if len(items) >= 2 and items[1]: user_crops = items[1]
+                if len(items) >= 3 and items[2]: user_land_area = items[2]
+                print(f"[OK] Profile updated: Name={user_name}, Crops={user_crops}, Area={user_land_area}\n")
+            else:
+                print(f"Current Profile: Name={user_name}, Crops={user_crops}, Area={user_land_area}\n")
+            continue
+
         if cmd.startswith("/location") or cmd.startswith("/l "):
             parts = prompt.split(maxsplit=1)
             if len(parts) > 1:
@@ -311,7 +327,7 @@ def main():
                     message=prompt,
                     sector=current_sector,
                     location=current_location,
-                    weather_context=current_weather,
+                    weather_context=f"{current_weather}\n\nUSER PROFILE (COLLECTED DETAILS):\nName: {user_name} | Sector: {current_sector} | Primary Crops: {user_crops} | Farm Area: {user_land_area} | Region: {current_location}",
                     history=history
                 )
             else:
@@ -319,7 +335,7 @@ def main():
                     message=prompt,
                     sector=current_sector,
                     location=current_location,
-                    weather_context=current_weather,
+                    weather_context=f"{current_weather}\n\nUSER PROFILE (COLLECTED DETAILS):\nName: {user_name} | Sector: {current_sector} | Primary Crops: {user_crops} | Farm Area: {user_land_area} | Region: {current_location}",
                     history=history
                 )
 

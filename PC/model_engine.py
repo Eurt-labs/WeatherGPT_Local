@@ -84,22 +84,24 @@ class LocalModelEngine:
         system_base = SECTOR_SYSTEM_PROMPTS.get(sector_focus.lower(), SECTOR_SYSTEM_PROMPTS["general"])
         
         rules = (
-            "STRICT CONVERSATIONAL & PROPORTIONALITY RULES:\n"
+            "STRICT CONVERSATIONAL, PROPORTIONALITY & PROACTIVE QUESTION RULES:\n"
             "1. PROPORTIONATE BREVITY: Match answer length strictly to the user's inquiry.\n"
             "   - For casual greetings ('hello', 'hi', 'namaste', 'good morning'): Respond warmly in ONLY 1 to 2 sentences. "
-            f"Briefly mention current temperature/weather at {location} and ask how you can assist their sector operations today. "
-            "STRICTLY FORBIDDEN: Do NOT output checklists, multi-paragraph essays, or unsolicited farming advice when greeted.\n"
+            f"Briefly mention current temperature/weather at {location}. If the user's name is in USER PROFILE, greet them by name. "
+            "Close with ONE proactive question asking if they want to know about their specific crops, farm operations, or travel.\n"
             "   - For specific questions (e.g. 'Should I irrigate today?', 'Will it rain at 4 PM?'): "
-            "Give a direct clear answer in the first sentence, followed by 2-3 brief supporting bullet points citing relevant Open-Meteo metrics (e.g. soil moisture, ET0, rain probability). "
-            "Do NOT mention unrelated topics (e.g., don't discuss harvesting or pesticides if asked about irrigation).\n"
-            "   - For comprehensive multi-part queries: Provide a structured, concise response with bullet points (maximum 150-200 words).\n"
-            "2. TELEMETRY GROUNDING: Use the provided Open-Meteo readings as absolute scientific ground truth. Cite exact numbers when relevant. Never hallucinate or contradict the telemetry.\n"
-            "3. NO REGURGITATION: Do NOT repeat the entire weather data block back to the user. Only reference the metrics that directly impact your advice."
+            "Give a direct clear answer in the first sentence, followed by 2-3 brief supporting bullet points citing relevant Open-Meteo metrics (e.g. soil moisture, ET0, rain probability).\n"
+            "2. PROACTIVE PROFILE-DRIVEN FOLLOW-UP:\n"
+            "   - Always conclude your response with ONE natural, helpful follow-up question customized to the user's profile details (such as their specific crops, farm area, or monitored region).\n"
+            "   - Examples for Farmers with crops (e.g. Wheat, Mustard): 'Would you like to know the best pesticide spraying window for your Wheat crop given the current wind speed?' or 'Do you want advice on irrigation scheduling for your 5 Acres field over the next 48 hours?'\n"
+            "   - Examples for Commuters / Disaster: 'Do you want to know if evening rain will affect transit in your region?' or 'Would you like me to assess flood risk for your monitored area?'\n"
+            "3. TELEMETRY GROUNDING: Use the provided Open-Meteo readings as absolute scientific ground truth. Cite exact numbers when relevant. Never hallucinate or contradict the telemetry.\n"
+            "4. NO REGURGITATION: Do NOT repeat the entire weather data block back to the user. Only reference the metrics that directly impact your advice."
         )
 
         system_prompt = (
             f"{system_base}\n\n"
-            "AUTHORITATIVE LIVE OPEN-METEO METEOROLOGICAL TELEMETRY:\n"
+            "AUTHORITATIVE LIVE OPEN-METEO METEOROLOGICAL TELEMETRY & USER PROFILE:\n"
             f"Location: {location}\n"
             f"{weather_context.strip()}\n\n"
             f"{rules}\n"
@@ -107,18 +109,18 @@ class LocalModelEngine:
 
         if is_voice_mode:
             system_prompt += (
-                "4. VOICE AI MODE ACTIVE: "
+                "5. VOICE AI MODE ACTIVE: "
                 "Answer in 1 to 3 spoken sentences maximum. "
                 "Never use markdown formatting, asterisks, bullet points, or lists so speech synthesis sounds natural."
             )
         elif is_detail_mode:
             system_prompt += (
-                "4. DETAIL MODE REQUESTED: "
+                "5. DETAIL MODE REQUESTED: "
                 "Provide a comprehensive, structured breakdown with clear section headers and numerical telemetry references."
             )
         else:
             system_prompt += (
-                "4. CHAT MODE: Keep responses concise, direct, and actionable."
+                "5. CHAT MODE: Keep responses concise, direct, and actionable."
             )
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -159,16 +161,16 @@ class LocalModelEngine:
 
         greeting = is_simple_greeting(user_message)
         if is_voice_mode:
-            max_tokens = 140
+            max_tokens = 150
             temperature = 0.6
         elif greeting:
-            max_tokens = 90
-            temperature = 0.5
+            max_tokens = 120
+            temperature = 0.55
         elif is_detail_mode:
             max_tokens = 512
             temperature = 0.7
         else:
-            max_tokens = 280
+            max_tokens = 320
             temperature = 0.65
 
         response = self.llm.create_chat_completion(
