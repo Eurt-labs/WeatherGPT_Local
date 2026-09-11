@@ -93,10 +93,8 @@ def fetch_live_open_meteo(city: str) -> Optional[Tuple[str, str]]:
             rain_prob = daily.get("precipitation_probability_max", [0])[0] if daily.get("precipitation_probability_max") else 0
 
             context = (
-                f"Live Atmosphere: {temp} deg C (Humidity: {hum}%, Dew Point: {dew} deg C, Pressure: {press} hPa, Wind: {wind} km/h)
-"
-                f"Precipitation Outlook: 24h Rain: {rain_sum} mm | Rain Chance: {rain_prob}%
-"
+                f"Live Atmosphere: {temp} deg C (Humidity: {hum}%, Dew Point: {dew} deg C, Pressure: {press} hPa, Wind: {wind} km/h)\n"
+                f"Precipitation Outlook: 24h Rain: {rain_sum} mm | Rain Chance: {rain_prob}%\n"
                 f"Agriculture & Soil: Topsoil Moisture: {soil_avg:.2f} m3/m3 | Evapotranspiration (ET0): {et0:.1f} mm/day"
             )
             return resolved_city, context
@@ -225,11 +223,11 @@ def main():
     print("  /fetch [city]                                       - Fetch live Open-Meteo data for any city")
     print("  /sector [farmer|disaster|commuter|aviation|general]  - Change role")
     print("  /weather [description]                              - Manually override weather")
-    print("  /location [city/state]                              - Change location
-  /profile [name, crops, area]                        - Set profile (e.g. /profile Dhruv | Wheat, Mustard | 5 Acres)")
+    print("  /location [city/state]                              - Change location")
+    print("  /profile [name, crops, area]                        - Set profile (e.g. /profile Dhruv | Wheat, Mustard | 5 Acres)")
     print("  /clear                                              - Clear conversation")
-    print("  /stop                                               - Stop server & exit
-  /exit                                               - Quit chat")
+    print("  /stop                                               - Stop server & exit")
+    print("  /exit                                               - Quit chat")
     print("=" * 70 + "\n")
 
     while True:
@@ -243,7 +241,7 @@ def main():
             continue
 
         cmd = prompt.lower()
-                if cmd in ["/stop", "/shutdown", "/kill"]:
+        if cmd in ["/stop", "/shutdown", "/kill"]:
             if is_server_mode:
                 print("[*] Stopping local server on port 8000...")
                 request_server_shutdown()
@@ -312,7 +310,7 @@ def main():
                 print(f"Current weather: {current_weather}\n")
             continue
 
-                if cmd.startswith("/profile"):
+        if cmd.startswith("/profile"):
             parts = prompt.split(maxsplit=1)
             if len(parts) > 1:
                 items = [x.strip() for x in parts[1].split("|")]

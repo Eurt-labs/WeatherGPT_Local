@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from config import HOST, PORT, MODELS_DIR, AVAILABLE_MODELS
@@ -62,7 +62,6 @@ def root():
         "status": "ready",
         "active_model": active_model,
         "endpoints": [
-            "/chat",
             "/api/server/shutdown",
             "/api/ai/chat-stream",
             "/api/ai/chat",
@@ -95,15 +94,6 @@ async def shutdown_server():
         "status": "shutting_down",
         "message": "WeatherGPT Local Server is shutting down and releasing all RAM."
     }
-
-@app.get("/chat", response_class=HTMLResponse)
-def web_chat_playground():
-    """Interactive Web Chat Playground for direct PC testing."""
-    html_file = Path(__file__).parent / "web_chat.html"
-    if html_file.exists():
-        with open(html_file, "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h3>WeatherGPT Web Chat file not found.</h3>"
 
 @app.get("/api/health")
 def health():
