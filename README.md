@@ -1,43 +1,36 @@
-# WeatherGPT Local & Edge Offline AI Engine
+# WeatherGPT Local — Developer Evaluation & Offline AI Engine 💻🤖
 
-[![SIH Problem Statement](https://img.shields.io/badge/SIH%202024-PS--26068-FF6F00?style=for-the-badge)](https://www.sih.gov.in/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![SIH Problem Statement](https://img.shields.io/badge/SIH%202026-PS--26068-FF6F00?style=for-the-badge)](https://www.sih.gov.in/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-GGUF%20Inference-792EE5?style=for-the-badge)](https://github.com/ggerganov/llama.cpp)
 [![Qwen 2.5](https://img.shields.io/badge/Qwen%202.5-7B%20%7C%203B%20%7C%201.5B-007ACC?style=for-the-badge)](https://huggingface.co/Qwen)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge)](LICENSE)
 
-**WeatherGPT_local** is an offline, edge-capable meteorological AI intelligence service designed to provide uninterrupted weather forecasting, agricultural crop advice, and disaster warning briefings in scenarios with **zero internet or cellular connectivity**.
-
-Built specifically to solve **Smart India Hackathon (SIH) Problem Statement PS-26068**, this repository powers the offline edge computing layer for the **[WeatherGPT Android Application](https://github.com/Eurt-labs/WeatherGPT_Android)**.
+> [!IMPORTANT]
+> **DEVELOPER WORKSTATION SUITE**: This repository is strictly an **internal developer evaluation and benchmarking environment** for running quantized GGUF models locally on a developer PC.  
+> The **[WeatherGPT Android Application](https://github.com/Eurt-labs/WeatherGPT_Android)** is the primary production target for end-users, communicating directly with the **[Cloud Backend on Render](https://github.com/Eurt-labs/WeatherGPT_Backend)**.
 
 ---
 
-## 🏛️ System Architecture
+## 🏗️ Architecture & Ecosystem Role
 
 ```
-                                  WEATHERGPT ECOSYSTEM
-                                  
- ┌────────────────────────────────────────────────────────────────────────┐
- │                      WeatherGPT Android Client                         │
- │           • Jetpack Compose Material 3 UI  • Offline Cache             │
- └─────────────────┬──────────────────────────────────┬───────────────────┘
-                   │ Online Mode                      │ Offline / Edge Mode
-                   ▼                                  ▼
- ┌──────────────────────────────────┐   ┌─────────────────────────────────┐
- │       Render Cloud Backend       │   │     WeatherGPT_local (Edge)     │
- │  • Google Gemini 3.6 Flash       │   │  • High-performance GGUF Engine │
- │  • OpenMeteo Satellite Feed      │   │  • Qwen 2.5 7B / 3B / 1.5B      │
- │  • PostgreSQL & Supabase Sync    │   │  • Zero-cloud reliance          │
- └──────────────────────────────────┘   └───┬─────────────────────────────┘
-                                            │
-                     ┌──────────────────────┴──────────────────────┐
-                     ▼                                             ▼
-       ┌───────────────────────────┐                 ┌───────────────────────────┐
-       │   PC Edge Server (Active) │                 │  On-Device Mobile (Phase 2)│
-       │ • FastAPI SSE Streaming   │                 │ • Direct Phone Execution  │
-       │ • CPU/GPU AVX2 Inference  │                 │ • Qualcomm NPU / APU      │
-       │ • USB / Wi-Fi Subnet Link │                 │ • ExecuTorch / ONNX       │
-       └───────────────────────────┘                 └───────────────────────────┘
+                              WEATHERGPT ECOSYSTEM
+                              
+ ┌──────────────────────────────────────────────────────────────────────────┐
+ │                       WeatherGPT Android Client                          │
+ │                       ★ THE PRODUCTION TARGET ★                          │
+ │           • Jetpack Compose M3 UI       • On-Device SQLite Cache         │
+ └────────────────────────────────────┬─────────────────────────────────────┘
+                   ┌──────────────────┴──────────────────┐
+                   │ (Production Cloud)                  │ (Internal Dev / Benchmarking)
+                   ▼                                     ▼
+ ┌───────────────────────────────────┐ ┌───────────────────────────────────┐
+ │       Render Cloud Backend        │ │     WeatherGPT_local (PC Dev)     │
+ │  • Google Gemini 3.6 Flash        │ │  • llama-cpp-python GGUF Engine   │
+ │  • Open-Meteo Satellite Feed      │ │  • Qwen 2.5 7B / 3B / 1.5B        │
+ │  • Supabase Sync & Rate Limiting  │ │  • Interactive Terminal CLI       │
+ └───────────────────────────────────┘ └───────────────────────────────────┘
 ```
 
 ---
@@ -46,43 +39,64 @@ Built specifically to solve **Smart India Hackathon (SIH) Problem Statement PS-2
 
 ```
 WeatherGPT_local/
-├── PC/                       # Complete PC / Laptop Offline AI Engine
-│   ├── models/               # Quantized GGUF model weights
-│   ├── config.py             # Inference parameters & SIH domain system prompts
-│   ├── download_model.py     # Automated HuggingFace downloader
-│   ├── model_engine.py       # llama-cpp-python streaming inference wrapper
-│   ├── main.py               # FastAPI server matching Render contract
-│   ├── requirements.txt      # Python dependencies
-│   ├── run_pc_server.bat     # 1-click Windows launcher
-│   └── README.md             # Dedicated PC server documentation
-├── Mobile/                   # Phase 2: Direct On-Device Mobile Integration
-│   └── README.md             # Mobile roadmap & architecture specifications
-├── .gitignore                # Production ignore rules (weights, venv, cache)
-├── LICENSE                   # Apache 2.0 Open Source License
-└── README.md                 # Project root documentation
+└── PC/                       # Developer PC Offline AI Engine
+    ├── models/               # Quantized GGUF model weights (git-ignored)
+    ├── config.py             # Inference parameters & SIH domain system prompts
+    ├── download_model.py     # Automated HuggingFace downloader with resume support
+    ├── model_engine.py       # llama-cpp-python streaming inference wrapper
+    ├── chat_cli.py           # Interactive terminal CLI chat with token streaming
+    ├── main.py               # FastAPI server matching Render SSE contract
+    ├── requirements.txt      # Python dependencies
+    ├── run_pc_server.bat     # 1-click Windows runner
+    ├── AGENTS.md             # Contributor & Agent Guardrails
+    └── README.md             # Dedicated PC server documentation
 ```
 
 ---
 
-## 🚀 Quickstart: Running the PC Offline Server
+## 🚀 Quickstart: Running & Testing on PC
 
 ### 1. Requirements
-- **PC:** Windows 10/11, 8GB+ RAM, 6GB free disk space.
+- **OS:** Windows 10/11 or Linux.
 - **Python:** Python 3.10 to 3.14.
-- **Phone:** Android device with [WeatherGPT Android App](https://github.com/Eurt-labs/WeatherGPT_Android).
+- **RAM:** 8GB+ recommended (for 3B/7B models).
 
-### 2. 1-Click Launch
-1. Open the **`PC`** folder.
-2. Double-click **`run_pc_server.bat`**.
-3. Choose your model size:
-   - **`7b`** (Recommended): Qwen 2.5 7B Instruct (Q4_K_M ~4.7 GB) — High-quality reasoning.
-   - **`3b`**: Qwen 2.5 3B Instruct (Q4_K_M ~2.1 GB) — Fast & lightweight.
-   - **`1.5b`**: Qwen 2.5 1.5B Instruct (Q4_K_M ~1.0 GB) — Ultra-fast.
-4. The server starts at `http://0.0.0.0:8000`.
+### 2. Launch the Local Server
+```bash
+cd PC
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start server (with interactive model picker or CLI flags):
+python main.py
+
+# Or specify model and port directly:
+python main.py -m 3b -p 8000
+```
+
+### 3. Interactive Terminal CLI Test
+To test the offline LLM directly from your terminal:
+```bash
+python chat_cli.py
+```
+- **Real-Time Token Streaming**: Streams answers token-by-token with live speed metrics (`tok/s`).
+- **Live Open-Meteo Telemetry**: Type `/fetch New Delhi` to pull real-time weather, soil moisture, and evapotranspiration into the conversation.
+- **Role Switching**: Switch sectors on the fly with `/sector farmer`, `/sector disaster`, `/sector commuter`, etc.
+- **Proactive Profile Guidance**: Generates tailored crop and location follow-ups.
+
+### 4. Clean Shutdown & Memory Release
+```bash
+python main.py --stop
+# Or type /stop directly in chat_cli.py
+```
+This immediately terminates the server process on port 8000 and releases all model weights from PC RAM.
 
 ---
 
-## 📱 Connecting to WeatherGPT Android
+## 📱 Developer Bridge: Pairing with Android
+
+For developer testing of offline connectivity from an Android device to your local PC:
 
 ### Option A: USB Cable (Zero Latency - Recommended)
 1. Plug your Android phone into your PC via USB (with **USB Debugging** enabled).
@@ -93,29 +107,18 @@ WeatherGPT_local/
 3. In the WeatherGPT Android App:
    - Go to **Settings ⚙️** -> **AI BACKEND & CONNECTION**.
    - Select **PC (USB)** (`http://localhost:8000`).
-   - Tap **Test Local PC Server Connection** to verify.
+   - Tap **Test Connection** to verify.
 
 ### Option B: Local Wi-Fi / Hotspot
 1. Connect PC and phone to the same Wi-Fi or phone hotspot.
-2. Check your PC's IP address (shown in `run_pc_server.bat`, e.g. `192.168.1.15`).
+2. Find your PC's local IP address (e.g., `192.168.1.15`).
 3. In the Android App Settings:
    - Select **PC (Wi-Fi)**.
    - Enter `http://<YOUR_PC_IP>:8000`.
-   - Tap **Test Local PC Server Connection**.
+   - Tap **Test Connection**.
 
 ---
 
-## 🎯 Sector-Specific Domain Intelligence
+## 📄 License
 
-WeatherGPT Local incorporates pre-configured system prompts tailored to specialized Indian user groups:
-- 🌾 **Kisan (Farmer):** Sowing advice, irrigation timing, soil moisture utilization, crop diseases, regional language communication.
-- 🚨 **Disaster Command Officer:** Barometric pressure analysis, river flood risks, actionable civil advisory alerts.
-- 🚗 **Urban Commuter:** Rain windows, fog visibility, Air Quality (AQI) safety alerts.
-- ✈️ **Aviation & Logistics:** Crosswind components, cloud ceilings, turbulence indicators.
-- 🌍 **General Citizen:** Real-time atmospheric insights and weather interpretations.
-
----
-
-## 📜 License
-
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.\n
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.

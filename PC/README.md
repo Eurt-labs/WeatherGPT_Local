@@ -1,14 +1,16 @@
-# WeatherGPT Local Offline Server (PC Edition)
+# WeatherGPT Local Offline Server (PC Edition) 💻⚙️
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-0.3.35-792EE5?style=flat-square)](https://github.com/abetlen/llama-cpp-python)
 [![Qwen 2.5](https://img.shields.io/badge/Model-Qwen%202.5%20GGUF-blue?style=flat-square)](https://huggingface.co/Qwen)
 
-The **PC Edition** of WeatherGPT Local is a standalone offline AI engine that runs quantized GGUF models directly on your workstation or laptop. It implements the exact Server-Sent Events (SSE) streaming API contract as the Render Cloud backend, allowing the **WeatherGPT Android application** to switch seamlessly between cloud and offline edge modes.
+> [!NOTE]
+> **DEVELOPER TESTING ENGINE**: This standalone PC server runs quantized GGUF models on a developer's workstation for offline testing and benchmarking.
+> The **[WeatherGPT Android Application](https://github.com/Eurt-labs/WeatherGPT_Android)** is the primary production target for end-users, running natively on mobile devices and backed by the **[Render Cloud Backend](https://github.com/Eurt-labs/WeatherGPT_Backend)**.
 
 ---
 
-## 📂 Folder Overview
+## 📁 Folder Overview
 
 ```
 PC/
@@ -16,9 +18,11 @@ PC/
 ├── config.py             # Model catalog, context length (4096), threads, prompts
 ├── download_model.py     # 1-click HuggingFace downloader with pause/resume support
 ├── model_engine.py       # llama-cpp-python streaming inference wrapper
-├── main.py               # FastAPI server matching Render contract
+├── chat_cli.py           # Interactive terminal CLI chat with token streaming
+├── main.py               # FastAPI server matching Render SSE contract
 ├── requirements.txt      # Python dependencies
 ├── run_pc_server.bat     # Crash-proof 1-click Windows runner
+├── AGENTS.md             # Developer & Agent Guardrails
 └── README.md             # This guide
 ```
 
@@ -29,12 +33,12 @@ PC/
 | Key | Model Name | Format | Weights Size | Recommended RAM | Best For |
 |---|---|---|---|---|---|
 | **`7b`** (Default) | Qwen 2.5 7B Instruct | `q4_k_m.gguf` | ~4.7 GB | ~6.0 GB | Deep agricultural, meteorological & disaster reasoning |
-| **`3b`** | Qwen 2.5 3B Instruct | `q4_k_m.gguf` | ~2.1 GB | ~3.5 GB | Balanced performance on budget laptops |
-| **`1.5b`** | Qwen 2.5 1.5B Instruct | `q4_k_m.gguf` | ~1.0 GB | ~1.8 GB | Ultra-fast responses with low memory footprint |
+| **`3b`** | Qwen 2.5 3B Instruct | `q4_k_m.gguf` | ~2.1 GB | ~3.5 GB | Balanced performance on standard laptops |
+| **`1.5b`** | Qwen 2.5 1.5B Instruct | `q4_k_m.gguf` | ~1.0 GB | ~1.8 GB | Ultra-fast responses with minimal memory footprint |
 
 ---
 
-## ⚡ Quickstart
+## 🚀 Quickstart
 
 ### 1. Automatic 1-Click Launch (Windows)
 Double-click **`run_pc_server.bat`**.
@@ -58,8 +62,6 @@ python main.py
 
 ---
 
----
-
 ## 💬 Testing & Chatting Directly on PC (CLI)
 
 You can test model responses directly on your PC using the **Interactive Terminal CLI** without needing an Android device connected:
@@ -70,19 +72,19 @@ python chat_cli.py
 
 - **Real-Time Token Streaming**: Streams answers token-by-token with live speed metrics (`tok/s`).
 - **Live Open-Meteo Fetching**:
-  - `/fetch New Delhi` - Live real-time weather & telemetry fetch from Open-Meteo
+  - `/fetch New Delhi` — Live real-time weather & telemetry fetch from Open-Meteo
 - **Interactive Sector Switching**:
-  - `/sector farmer` - Switch to Kisan / Agronomy mode
-  - `/sector disaster` - Switch to Disaster Command mode
-  - `/sector commuter` - Switch to Urban Travel mode
-  - `/sector aviation` - Switch to Flight / Drone mode
+  - `/sector farmer` — Switch to Kisan / Agronomy mode
+  - `/sector disaster` — Switch to Disaster Command mode
+  - `/sector commuter` — Switch to Urban Travel mode
+  - `/sector aviation` — Switch to Flight / Drone mode
 - **Weather & Location Simulation**:
   - `/weather Temp: 34°C, Humidity: 85%, Rain: Heavy`
   - `/location Patna, Bihar`
-  - `/clear` - Reset conversation memory
+  - `/clear` — Reset conversation memory
 - **Clean Server Control & Exit**:
-  - `/stop` - Instantly terminates local server on port 8000 and releases all model RAM
-  - `/exit` - Quit chat session
+  - `/stop` — Instantly terminates local server on port 8000 and releases all model RAM
+  - `/exit` — Quit chat session
 - **Smart Memory Sharing**: Automatically connects to the running server on port 8000 to avoid loading duplicate model weights into RAM. If the server is offline, it runs the engine directly.
 
 ### Server Management via Python:
@@ -91,18 +93,24 @@ python chat_cli.py
 python main.py
 
 # Start server with specific model and port
-python main.py -m 7b -p 8000
+python main.py -m 3b -p 8000
 
 # Cleanly stop running server, free port 8000 & release model RAM
 python main.py --stop
 ```
+
+---
 
 ## 🔌 API Reference & Contracts
 
 ### 1. SSE Real-Time Chat Stream (Matching Android Contract)
 - **Endpoint:** `POST /api/ai/chat-stream`
 - **Content-Type:** `application/json`
-- **Response:** `text/event-stream` (`data: <token>\n\n` -> `data: [DONE]\n\n`)
+- **Response:** `text/event-stream` (`data: <token>
+
+` -> `data: [DONE]
+
+`)
 
 **Request Body:**
 ```json
@@ -117,26 +125,11 @@ python main.py --stop
 }
 ```
 
-**cURL Test:**
-```bash
-curl -N -X POST http://localhost:8000/api/ai/chat-stream \
-  -H "Content-Type: application/json" \
-  -d '{"message":"Give me rain guidance","sector_focus":"farmer"}'
-```
-
 ---
 
 ### 2. Single-Turn Chat Completion (Test Ping)
 - **Endpoint:** `POST /api/ai/chat`
 - **Description:** Used by the Android app's "Test Local PC Server Connection" button to verify server health and latency.
-
-**Response:**
-```json
-{
-  "response": "Based on current observations, rain is unlikely...",
-  "model": "qwen2.5-7b-instruct-q4_k_m.gguf"
-}
-```
 
 ---
 
@@ -147,7 +140,7 @@ curl -N -X POST http://localhost:8000/api/ai/chat-stream \
 ```json
 {
   "status": "online",
-  "model": "qwen2.5-7b-instruct-q4_k_m.gguf",
+  "model": "qwen2.5-3b-instruct-q4_k_m.gguf",
   "engine": "llama-cpp-python (GGUF)",
   "ram_total_gb": 15.82,
   "ram_used_gb": 7.14,
@@ -160,13 +153,13 @@ curl -N -X POST http://localhost:8000/api/ai/chat-stream \
 
 ### 4. Offline Weather Calculations Fallback
 - **Endpoint:** `POST /api/weather/live`
-- **Description:** Generates realistic meteorological calculations (soil moisture, VPD, dew point spread, flood risk) when the device has zero internet connectivity.
+- **Description:** Generates realistic meteorological calculations (soil moisture, VPD, dew point spread, flood risk) when offline.
 
 ---
 
 ## 📱 Pairing with WeatherGPT Android
 
-### Via USB Cable (Zero Latency)
+### Via USB Cable (Zero Latency - Recommended)
 1. Connect Android phone to PC via USB cable.
 2. Ensure **USB Debugging** is turned on in phone Developer Options.
 3. In terminal, run:

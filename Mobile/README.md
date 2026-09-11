@@ -1,30 +1,15 @@
-# Phase 2: Direct On-Device Mobile Integration
+# Mobile Experimental On-Device GGUF Research 📱🧪
 
-This directory is designated for **Phase 2** of the offline AI initiative: running compact quantized models directly on the Android mobile device without needing an external PC server.
-
----
-
-## 🎯 Objective
-
-Enable the **WeatherGPT Android application** to perform local LLM inference directly on mobile hardware (Snapdragon, MediaTek, Tensor) with zero cellular data and zero local network infrastructure.
+> [!NOTE]
+> **RESEARCH DIRECTORY ONLY**:
+> The primary production mobile application is **[`WeatherGPT_Android`](https://github.com/Eurt-labs/WeatherGPT_Android)**. In production, users run the Android phone app directly, which communicates with the **[`WeatherGPT_Backend`](https://github.com/Eurt-labs/WeatherGPT_Backend)** on Render and uses on-device SQLite and telemetry caches when offline.
+>
+> This directory is strictly an **internal experimental research track** investigating embedded `llama.cpp` C++ Android NDK builds and mobile quantization.
 
 ---
 
-## 🏗️ Technical Architecture & Approach
+## 🎯 Research Scope & Exploration
 
-| Component | Target Technology | Description |
-|---|---|---|
-| **Quantization** | Q3_K_S / Q4_K_M (1.5B - 3B) | Quantized to ~1.0 GB to safely operate under Android's Low Memory Killer (LMK). |
-| **Runtime Engine** | llama.cpp Android NDK / ExecuTorch | Native C++ JNI bindings embedded directly inside the Android `.apk`. |
-| **Hardware Acceleration** | Qualcomm QNN / Vulkan / OpenCL | Offloading matrix multiplication to mobile GPU / NPU for fast token generation. |
-| **Fallback Strategy** | Graceful Degradation | App automatically falls back: Render Cloud -> Local PC Edge -> On-Device Mobile. |
-
----
-
-## 🗺️ Roadmap
-
-- [x] **Phase 1 (Active):** Standalone Local PC Server running Qwen 2.5 GGUF with drop-in FastAPI SSE streaming for high-quality testing.
-- [ ] **Phase 2.1:** Android NDK C++ build integration (`libllama.so` with ARM64-v8a optimizations).
-- [ ] **Phase 2.2:** JNI Kotlin wrapper and streaming callback interface.
-- [ ] **Phase 2.3:** On-device model downloader and local asset verification.
-- [ ] **Phase 2.4:** Benchmark power consumption, memory footprint, and thermal throttling.\n
+- Evaluating embedded ARM64-v8a NDK libraries (`libllama.so`).
+- Benchmarking memory consumption and thermal performance of sub-2B parameter models under Android's Low Memory Killer (LMK).
+- Exploring hardware acceleration across mobile GPUs and NPUs (Qualcomm QNN / Vulkan).
