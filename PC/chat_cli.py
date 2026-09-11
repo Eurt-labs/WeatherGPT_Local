@@ -25,6 +25,15 @@ SECTOR_DISPLAY = {
     "general": "General Meteorological Inquiries"
 }
 
+def request_server_shutdown():
+    try:
+        req = urllib.request.Request(f"{SERVER_URL}/api/server/shutdown", data=b"{}", headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=2) as res:
+            if res.status == 200:
+                print("[OK] Sent shutdown signal to server. Memory released.")
+    except Exception:
+        pass
+
 def check_server() -> Optional[Dict]:
     try:
         req = urllib.request.Request(f"{SERVER_URL}/api/health", headers={"User-Agent": "WeatherGPT-CLI"})
@@ -219,7 +228,8 @@ def main():
     print("  /location [city/state]                              - Change location
   /profile [name, crops, area]                        - Set profile (e.g. /profile Dhruv | Wheat, Mustard | 5 Acres)")
     print("  /clear                                              - Clear conversation")
-    print("  /exit                                               - Quit chat")
+    print("  /stop                                               - Stop server & exit
+  /exit                                               - Quit chat")
     print("=" * 70 + "\n")
 
     while True:
@@ -233,7 +243,21 @@ def main():
             continue
 
         cmd = prompt.lower()
+                if cmd in ["/stop", "/shutdown", "/kill"]:
+            if is_server_mode:
+                print("[*] Stopping local server on port 8000...")
+                request_server_shutdown()
+            print("WeatherGPT Server stopped. Goodbye!")
+            break
+
         if cmd in ["/exit", "/quit", "/q", "exit", "quit"]:
+            if is_server_mode:
+                try:
+                    ans = input("Do you also want to stop the local server to free RAM? (y/N): ").strip().lower()
+                    if ans in ["y", "yes"]:
+                        request_server_shutdown()
+                except Exception:
+                    pass
             print("Exiting WeatherGPT Chat. Goodbye!")
             break
 
