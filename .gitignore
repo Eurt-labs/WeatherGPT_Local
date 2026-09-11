@@ -1,0 +1,52 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# C extensions
+*.obj
+*.o
+*.a
+*.lib
+*.pyd
+
+# Large Model Weights & GGUF binaries (Do not commit to Git)
+models/*.gguf
+models/*.bin
+models/*.safetensors
+models/*.pth
+models/.cache/
+**/models/*.gguf
+**/models/*.bin
+**/models/*.safetensors
+**/models/.cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+**/venv/
+**/.venv/
+
+# Environment variables & secrets
+.env
+.env.local
+*.env
+
+# IDE & OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs & temporary files
+*.log
+scratch/
+tmp/
+temp/\n
