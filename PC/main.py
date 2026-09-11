@@ -176,6 +176,7 @@ async def chat_stream(req: ChatRequest):
                 sector_focus=req.sector_focus or "farmer",
                 language=req.language or "en",
                 is_voice_mode=req.is_voice_mode or False,
+                is_detail_mode=req.is_detail_mode or False,
                 history=req.history or []
             ):
                 yield f"data: {token}\n\n"

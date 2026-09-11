@@ -1,8 +1,26 @@
 import os
+import re
 from pathlib import Path
 from typing import Generator, List, Dict, Any, Optional
 from llama_cpp import Llama
 from config import MODELS_DIR, N_CTX, N_THREADS, N_GPU_LAYERS, SECTOR_SYSTEM_PROMPTS, AVAILABLE_MODELS
+
+GREETING_WORDS = {
+    "hello", "hi", "hey", "namaste", "namaskar", "good morning", "good evening", 
+    "good afternoon", "howdy", "hola", "ram ram", "kisan bhai", "who are you",
+    "help", "start", "test"
+}
+
+def is_simple_greeting(msg: str) -> bool:
+    clean = re.sub(r'[^a-zA-Z\s]', '', msg).strip().lower()
+    words = clean.split()
+    if not words:
+        return True
+    if len(words) <= 3 and any(w in GREETING_WORDS for w in words):
+        return True
+    if clean in GREETING_WORDS:
+        return True
+    return False
 
 class LocalModelEngine:
     def __init__(self, model_path: Optional[Path] = None):
@@ -37,11 +55,11 @@ class LocalModelEngine:
         target_path = self._find_model_file()
         self.model_path = target_path
         self.model_filename = target_path.name
-        print(f"\n=======================================================")
+        print("\n=======================================================")
         print(f"[ENGINE] Loading local GGUF model: {target_path.name}")
         print(f"[ENGINE] Size: {target_path.stat().st_size / (1024**3):.2f} GB")
         print(f"[ENGINE] Context: {N_CTX} tokens | CPU Threads: {N_THREADS} | GPU Layers: {N_GPU_LAYERS}")
-        print(f"=======================================================\n")
+        print("=======================================================\n")
         
         self.llm = Llama(
             model_path=str(target_path),
@@ -50,7 +68,7 @@ class LocalModelEngine:
             n_gpu_layers=N_GPU_LAYERS,
             verbose=False
         )
-        print(f"[ENGINE] Model initialized and ready for offline inference!\n")
+        print("[ENGINE] Model initialized and ready for offline inference!\n")
 
     def build_prompt_messages(
         self,
@@ -60,27 +78,47 @@ class LocalModelEngine:
         sector_focus: str,
         language: str,
         is_voice_mode: bool,
+        is_detail_mode: bool,
         history: List[Dict[str, str]]
     ) -> List[Dict[str, str]]:
         system_base = SECTOR_SYSTEM_PROMPTS.get(sector_focus.lower(), SECTOR_SYSTEM_PROMPTS["general"])
         
+        rules = (
+            "STRICT CONVERSATIONAL & PROPORTIONALITY RULES:\n"
+            "1. PROPORTIONATE BREVITY: Match answer length strictly to the user's inquiry.\n"
+            "   - For casual greetings ('hello', 'hi', 'namaste', 'good morning'): Respond warmly in ONLY 1 to 2 sentences. "
+            f"Briefly mention current temperature/weather at {location} and ask how you can assist their sector operations today. "
+            "STRICTLY FORBIDDEN: Do NOT output checklists, multi-paragraph essays, or unsolicited farming advice when greeted.\n"
+            "   - For specific questions (e.g. 'Should I irrigate today?', 'Will it rain at 4 PM?'): "
+            "Give a direct clear answer in the first sentence, followed by 2-3 brief supporting bullet points citing relevant Open-Meteo metrics (e.g. soil moisture, ET0, rain probability). "
+            "Do NOT mention unrelated topics (e.g., don't discuss harvesting or pesticides if asked about irrigation).\n"
+            "   - For comprehensive multi-part queries: Provide a structured, concise response with bullet points (maximum 150-200 words).\n"
+            "2. TELEMETRY GROUNDING: Use the provided Open-Meteo readings as absolute scientific ground truth. Cite exact numbers when relevant. Never hallucinate or contradict the telemetry.\n"
+            "3. NO REGURGITATION: Do NOT repeat the entire weather data block back to the user. Only reference the metrics that directly impact your advice."
+        )
+
         system_prompt = (
             f"{system_base}\n\n"
-            f"LIVE METEOROLOGICAL CONTEXT:\n"
+            "AUTHORITATIVE LIVE OPEN-METEO METEOROLOGICAL TELEMETRY:\n"
             f"Location: {location}\n"
-            f"{weather_context}\n"
+            f"{weather_context.strip()}\n\n"
+            f"{rules}\n"
         )
 
         if is_voice_mode:
             system_prompt += (
-                "\nVOICE AI MODE ACTIVE: "
-                "Give a natural, warm, conversational answer in 1 to 3 sentences maximum. "
-                "Never use markdown formatting, asterisks, bullet points, or lists so speech synthesis sounds completely fluent."
+                "4. VOICE AI MODE ACTIVE: "
+                "Answer in 1 to 3 spoken sentences maximum. "
+                "Never use markdown formatting, asterisks, bullet points, or lists so speech synthesis sounds natural."
+            )
+        elif is_detail_mode:
+            system_prompt += (
+                "4. DETAIL MODE REQUESTED: "
+                "Provide a comprehensive, structured breakdown with clear section headers and numerical telemetry references."
             )
         else:
             system_prompt += (
-                "\nCHAT MODE: "
-                "Provide a clear, helpful, well-structured response with key weather insights."
+                "4. CHAT MODE: Keep responses concise, direct, and actionable."
             )
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -102,6 +140,7 @@ class LocalModelEngine:
         sector_focus: str = "farmer",
         language: str = "en",
         is_voice_mode: bool = False,
+        is_detail_mode: bool = False,
         history: List[Dict[str, str]] = None
     ) -> Generator[str, None, None]:
         if not self.llm:
@@ -114,11 +153,23 @@ class LocalModelEngine:
             sector_focus=sector_focus,
             language=language,
             is_voice_mode=is_voice_mode,
+            is_detail_mode=is_detail_mode,
             history=history or []
         )
 
-        max_tokens = 256 if is_voice_mode else 768
-        temperature = 0.6 if is_voice_mode else 0.7
+        greeting = is_simple_greeting(user_message)
+        if is_voice_mode:
+            max_tokens = 140
+            temperature = 0.6
+        elif greeting:
+            max_tokens = 90
+            temperature = 0.5
+        elif is_detail_mode:
+            max_tokens = 512
+            temperature = 0.7
+        else:
+            max_tokens = 280
+            temperature = 0.65
 
         response = self.llm.create_chat_completion(
             messages=messages,
@@ -143,6 +194,7 @@ class LocalModelEngine:
         sector_focus: str = "farmer",
         language: str = "en",
         is_voice_mode: bool = False,
+        is_detail_mode: bool = False,
         history: List[Dict[str, str]] = None
     ) -> str:
         tokens = list(self.stream_completion(
@@ -152,6 +204,7 @@ class LocalModelEngine:
             sector_focus=sector_focus,
             language=language,
             is_voice_mode=is_voice_mode,
+            is_detail_mode=is_detail_mode,
             history=history
         ))
         return "".join(tokens).strip()

@@ -3,8 +3,9 @@ import sys
 import time
 import json
 import urllib.request
+import urllib.parse
 import urllib.error
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 # Ensure UTF-8 output in Windows console without crash
 if sys.platform == "win32":
@@ -33,6 +34,65 @@ def check_server() -> Optional[Dict]:
     except Exception:
         pass
     return None
+
+def fetch_live_open_meteo(city: str) -> Optional[Tuple[str, str]]:
+    """
+    Direct Open-Meteo numerical weather model ingestion (zero API keys).
+    Retrieves temperature, humidity, wind, pressure, topsoil moisture,
+    evapotranspiration (ET0), and 24h precipitation probability.
+    """
+    try:
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city)}&count=1&language=en&format=json"
+        req = urllib.request.Request(geo_url, headers={"User-Agent": "WeatherGPT-PC"})
+        with urllib.request.urlopen(req, timeout=4) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            results = data.get("results", [])
+            if not results:
+                return None
+            loc = results[0]
+            lat = loc["latitude"]
+            lon = loc["longitude"]
+            resolved_city = f"{loc.get('name')}, {loc.get('admin1', '')} ({loc.get('country_code', '')})"
+
+        weather_url = (
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,surface_pressure,dew_point_2m"
+            "&hourly=soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,et0_fao_evapotranspiration,precipitation_probability"
+            "&daily=precipitation_sum,precipitation_probability_max,temperature_2m_max,temperature_2m_min"
+            "&timezone=auto"
+        )
+        req2 = urllib.request.Request(weather_url, headers={"User-Agent": "WeatherGPT-PC"})
+        with urllib.request.urlopen(req2, timeout=5) as res2:
+            wdata = json.loads(res2.read().decode("utf-8"))
+            curr = wdata.get("current", {})
+            hourly = wdata.get("hourly", {})
+            daily = wdata.get("daily", {})
+
+            temp = curr.get("temperature_2m", 28.0)
+            hum = curr.get("relative_humidity_2m", 60)
+            wind = curr.get("wind_speed_10m", 10.0)
+            dew = curr.get("dew_point_2m", 20.0)
+            press = curr.get("surface_pressure", 1012.0)
+            code = curr.get("weather_code", 0)
+
+            sm1 = hourly.get("soil_moisture_0_to_1cm", [0.30])[0] if hourly.get("soil_moisture_0_to_1cm") else 0.30
+            sm2 = hourly.get("soil_moisture_1_to_3cm", [0.32])[0] if hourly.get("soil_moisture_1_to_3cm") else 0.32
+            soil_avg = (sm1 + sm2) / 2.0
+            et0 = hourly.get("et0_fao_evapotranspiration", [4.2])[0] if hourly.get("et0_fao_evapotranspiration") else 4.2
+
+            rain_sum = daily.get("precipitation_sum", [0.0])[0] if daily.get("precipitation_sum") else 0.0
+            rain_prob = daily.get("precipitation_probability_max", [0])[0] if daily.get("precipitation_probability_max") else 0
+
+            context = (
+                f"Live Atmosphere: {temp} deg C (Humidity: {hum}%, Dew Point: {dew} deg C, Pressure: {press} hPa, Wind: {wind} km/h)
+"
+                f"Precipitation Outlook: 24h Rain: {rain_sum} mm | Rain Chance: {rain_prob}%
+"
+                f"Agriculture & Soil: Topsoil Moisture: {soil_avg:.2f} m3/m3 | Evapotranspiration (ET0): {et0:.1f} mm/day"
+            )
+            return resolved_city, context
+    except Exception as e:
+        return None
 
 def stream_from_server(
     message: str,
@@ -132,18 +192,28 @@ def main():
 
     current_sector = "farmer"
     current_location = "New Delhi, India"
-    current_weather = "Temp: 29.5 deg C | Humidity: 68% | Wind: 14 km/h | Condition: Partly Cloudy"
+    current_weather = "Live Atmosphere: 29.5 deg C (Humidity: 68%, Dew Point: 22.0 deg C, Pressure: 1012 hPa, Wind: 14 km/h)\nPrecipitation Outlook: 24h Rain: 0.0 mm | Rain Chance: 10%\nAgriculture & Soil: Topsoil Moisture: 0.33 m3/m3 | Evapotranspiration (ET0): 4.2 mm/day"
+
+    print("[*] Contacting Open-Meteo for live telemetry...")
+    om_res = fetch_live_open_meteo("New Delhi")
+    if om_res:
+        current_location, current_weather = om_res
+        print(f"[OK] Live Open-Meteo telemetry loaded for: {current_location}")
+    else:
+        print(f"[*] Using cached baseline weather for: {current_location}")
+
     history: List[Dict[str, str]] = []
 
     print("-" * 70)
     print(f"Current Sector  : {SECTOR_DISPLAY.get(current_sector)}")
     print(f"Current Location: {current_location}")
-    print(f"Weather Context : {current_weather}")
+    print(f"Open-Meteo Data : {current_weather.splitlines()[0]}")
     print("-" * 70)
     print("Interactive Commands:")
+    print("  /fetch [city]                                       - Fetch live Open-Meteo data for any city")
     print("  /sector [farmer|disaster|commuter|aviation|general]  - Change role")
-    print("  /weather [description]                              - Simulate weather")
-    print("  /location [city/state]                              - Set location")
+    print("  /weather [description]                              - Manually override weather")
+    print("  /location [city/state]                              - Change location")
     print("  /clear                                              - Clear conversation")
     print("  /exit                                               - Quit chat")
     print("=" * 70 + "\n")
@@ -166,6 +236,22 @@ def main():
         if cmd in ["/clear", "/c", "clear"]:
             history.clear()
             print("[OK] Conversation history cleared.\n")
+            continue
+
+        if cmd.startswith("/fetch"):
+            parts = prompt.split(maxsplit=1)
+            target_city = parts[1].strip() if len(parts) > 1 else current_location.split(",")[0]
+            print(f"[*] Fetching live Open-Meteo data for '{target_city}'...")
+            res = fetch_live_open_meteo(target_city)
+            if res:
+                current_location, current_weather = res
+                print(f"[OK] Successfully updated to live Open-Meteo telemetry:")
+                print(f"  Location: {current_location}")
+                for l in current_weather.splitlines():
+                    print(f"  {l}")
+                print()
+            else:
+                print(f"[!] Could not fetch Open-Meteo data for '{target_city}'.\n")
             continue
 
         if cmd.startswith("/sector") or cmd.startswith("/s "):
@@ -201,14 +287,21 @@ def main():
         if cmd.startswith("/location") or cmd.startswith("/l "):
             parts = prompt.split(maxsplit=1)
             if len(parts) > 1:
-                current_location = parts[1].strip()
-                print(f"[OK] Location updated to: {current_location}\n")
+                new_loc = parts[1].strip()
+                print(f"[*] Fetching live Open-Meteo data for '{new_loc}'...")
+                res = fetch_live_open_meteo(new_loc)
+                if res:
+                    current_location, current_weather = res
+                    print(f"[OK] Location and Open-Meteo telemetry updated to: {current_location}\n")
+                else:
+                    current_location = new_loc
+                    print(f"[OK] Location set to: {current_location}\n")
             else:
                 print(f"Current location: {current_location}\n")
             continue
 
         if cmd in ["/help", "/h", "help"]:
-            print("Commands: /sector, /weather, /location, /clear, /exit\n")
+            print("Commands: /fetch, /sector, /weather, /location, /clear, /exit\n")
             continue
 
         print(f"\nAI ({active_model}) > ", end="", flush=True)
