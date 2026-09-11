@@ -1,19 +1,23 @@
 import os
+import sys
+import argparse
 import psutil
 import uvicorn
+from pathlib import Path
 from typing import List, Dict, Optional, Any
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from config import HOST, PORT
-from model_engine import get_engine
+from config import HOST, PORT, MODELS_DIR, AVAILABLE_MODELS
+from model_engine import get_engine, switch_model
+from download_model import download_model
 
 app = FastAPI(
     title="WeatherGPT Local Offline Engine",
     description="Offline GGUF model server drop-in compatible with WeatherGPT_Android",
-    version="1.0.0"
+    version="1.1.0"
 )
 
 app.add_middleware(
@@ -38,12 +42,31 @@ class ChatRequest(BaseModel):
     is_detail_mode: Optional[bool] = False
     history: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
 
+class ModelSwitchRequest(BaseModel):
+    model_name: Optional[str] = None
+    model_key: Optional[str] = None
+
 @app.get("/")
 def root():
+    engine = None
+    active_model = "Initializing..."
+    try:
+        engine = get_engine()
+        active_model = engine.model_filename
+    except Exception:
+        pass
     return {
         "service": "WeatherGPT Local Offline AI Engine",
         "status": "ready",
-        "endpoints": ["/api/ai/chat-stream", "/api/ai/chat", "/api/health", "/api/weather/live"]
+        "active_model": active_model,
+        "endpoints": [
+            "/api/ai/chat-stream",
+            "/api/ai/chat",
+            "/api/health",
+            "/api/models",
+            "/api/models/switch",
+            "/api/weather/live"
+        ]
     }
 
 @app.get("/api/health")
@@ -66,6 +89,64 @@ def health():
         "ram_percent": mem.percent,
         "cpu_threads": os.cpu_count()
     }
+
+@app.get("/api/models")
+def list_models():
+    """List all downloaded models on disk and available models in catalog."""
+    downloaded = []
+    for f in MODELS_DIR.glob("*.gguf"):
+        downloaded.append({
+            "filename": f.name,
+            "size_gb": round(f.stat().st_size / (1024**3), 2),
+            "path": str(f)
+        })
+
+    active = None
+    try:
+        active = get_engine().model_filename
+    except Exception:
+        pass
+
+    return {
+        "active_model": active,
+        "downloaded_models": downloaded,
+        "catalog": AVAILABLE_MODELS
+    }
+
+@app.post("/api/models/switch")
+def switch_active_model(req: ModelSwitchRequest):
+    """Switch active running model in real time without restarting server."""
+    target_path = None
+    if req.model_key and req.model_key in AVAILABLE_MODELS:
+        fname = AVAILABLE_MODELS[req.model_key]["filename"]
+        cand = MODELS_DIR / fname
+        if cand.exists():
+            target_path = cand
+        else:
+            return JSONResponse(status_code=404, content={"error": f"Model {fname} not downloaded yet."})
+
+    if not target_path and req.model_name:
+        cand = MODELS_DIR / req.model_name
+        if cand.exists():
+            target_path = cand
+        else:
+            # Check direct path
+            p = Path(req.model_name)
+            if p.exists():
+                target_path = p
+
+    if not target_path:
+        return JSONResponse(status_code=400, content={"error": "Valid model_name or model_key required."})
+
+    try:
+        new_engine = switch_model(target_path)
+        return {
+            "status": "success",
+            "switched_to": new_engine.model_filename,
+            "size_gb": round(target_path.stat().st_size / (1024**3), 2)
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to switch model: {str(e)}"})
 
 @app.post("/api/ai/chat-stream")
 async def chat_stream(req: ChatRequest):
@@ -143,6 +224,107 @@ async def weather_live(body: Dict[str, Any] = None):
         "source": "Local WeatherGPT Offline Meteorological Model"
     }
 
+def choose_model_interactive(requested_arg: Optional[str] = None) -> Path:
+    """
+    Interactive terminal selector allowing the user to pick which model to load.
+    Supports CLI argument `--model 3b` or interactive numeric menu.
+    """
+    downloaded_models = sorted(list(MODELS_DIR.glob("*.gguf")), key=lambda p: p.stat().st_size, reverse=True)
+
+    # 1. If explicit CLI argument provided
+    if requested_arg:
+        key = requested_arg.lower().replace("-", "")
+        # Check catalog key
+        if key in AVAILABLE_MODELS:
+            fname = AVAILABLE_MODELS[key]["filename"]
+            target = MODELS_DIR / fname
+            if target.exists():
+                return target
+            else:
+                print(f"[!] Model {AVAILABLE_MODELS[key]['name']} is not downloaded.")
+                print(f"[*] Downloading now...")
+                dl = download_model(key)
+                return Path(dl)
+        # Check by filename / path
+        cand = Path(requested_arg)
+        if cand.exists():
+            return cand
+        cand_sub = MODELS_DIR / requested_arg
+        if cand_sub.exists():
+            return cand_sub
+        print(f"[!] Warning: requested model '{requested_arg}' not found on disk.")
+
+    # 2. If models exist on disk
+    if downloaded_models:
+        print("\n=======================================================")
+        print("          WeatherGPT Local AI Model Selector")
+        print("=======================================================")
+        print("Found the following downloaded models in models/:")
+        for i, m in enumerate(downloaded_models, 1):
+            size_gb = m.stat().st_size / (1024**3)
+            # Find catalog friendly name if known
+            friendly = m.name
+            for k, info in AVAILABLE_MODELS.items():
+                if info["filename"] == m.name:
+                    friendly = f"{info['name']} [{k}]"
+                    break
+            print(f"  [{i}] {friendly} ({size_gb:.2f} GB)")
+
+        dl_idx = len(downloaded_models) + 1
+        print(f"  [{dl_idx}] Download another model from Hugging Face catalog")
+        print("=======================================================")
+
+        try:
+            choice = input(f"Select model to activate [default: 1]: ").strip()
+            if not choice:
+                return downloaded_models[0]
+
+            choice_int = int(choice)
+            if 1 <= choice_int <= len(downloaded_models):
+                return downloaded_models[choice_int - 1]
+            elif choice_int == dl_idx:
+                print("\nAvailable models to download:")
+                for k, v in AVAILABLE_MODELS.items():
+                    print(f"  [{k}] {v['name']} ({v['size']})")
+                dl_key = input("Enter model key (7b / 3b / 1.5b): ").strip().lower()
+                dl_path = download_model(dl_key if dl_key in AVAILABLE_MODELS else "7b")
+                return Path(dl_path)
+        except Exception:
+            pass
+
+        return downloaded_models[0]
+
+    # 3. No models on disk yet
+    print("\n[!] No GGUF models found in models/ folder.")
+    print("[*] Launching model catalog downloader...")
+    dl_path = download_model("7b")
+    return Path(dl_path)
+
 if __name__ == "__main__":
-    print(f"Starting WeatherGPT Local Server on http://{HOST}:{PORT}")
-    uvicorn.run(app, host=HOST, port=PORT)
+    parser = argparse.ArgumentParser(description="WeatherGPT Local Offline AI Engine")
+    parser.add_argument("--model", "-m", type=str, default=None, help="Model key (7b, 3b, 1.5b) or path to .gguf file")
+    parser.add_argument("--port", "-p", type=int, default=PORT, help="Port to listen on (default: 8000)")
+    parser.add_argument("--host", type=str, default=HOST, help="Host address (default: 0.0.0.0)")
+    parser.add_argument("--list", "-l", action="store_true", help="List downloaded and catalog models")
+
+    args = parser.parse_args()
+
+    if args.list:
+        print("\nDownloaded Models:")
+        for f in MODELS_DIR.glob("*.gguf"):
+            print(f" - {f.name} ({f.stat().st_size / (1024**3):.2f} GB)")
+        print("\nCatalog:")
+        for k, v in AVAILABLE_MODELS.items():
+            print(f" [{k}] {v['name']} ({v['size']})")
+        sys.exit(0)
+
+    # Interactive or CLI model selection
+    selected_model = choose_model_interactive(args.model)
+    os.environ["WEATHERGPT_MODEL"] = str(selected_model)
+
+    # Preload engine into memory so first query is instant
+    engine = get_engine(selected_model)
+
+    print(f"[READY] WeatherGPT Local Server initialized with: {engine.model_filename}")
+    print(f"[READY] Starting FastAPI server on http://{args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port)

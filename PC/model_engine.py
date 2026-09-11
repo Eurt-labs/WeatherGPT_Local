@@ -1,34 +1,50 @@
 import os
 from pathlib import Path
-from typing import Generator, List, Dict, Any
+from typing import Generator, List, Dict, Any, Optional
 from llama_cpp import Llama
-from config import MODELS_DIR, N_CTX, N_THREADS, N_GPU_LAYERS, SECTOR_SYSTEM_PROMPTS
+from config import MODELS_DIR, N_CTX, N_THREADS, N_GPU_LAYERS, SECTOR_SYSTEM_PROMPTS, AVAILABLE_MODELS
 
 class LocalModelEngine:
-    def __init__(self):
+    def __init__(self, model_path: Optional[Path] = None):
         self.llm = None
-        self.model_filename = None
+        self.model_path = model_path
+        self.model_filename = model_path.name if model_path else None
         self._load_model()
 
     def _find_model_file(self) -> Path:
+        if self.model_path and Path(self.model_path).exists():
+            return Path(self.model_path)
+
+        env_model = os.getenv("WEATHERGPT_MODEL")
+        if env_model:
+            p = Path(env_model)
+            if p.exists():
+                return p
+            p_sub = MODELS_DIR / env_model
+            if p_sub.exists():
+                return p_sub
+
         gguf_files = list(MODELS_DIR.glob("*.gguf"))
         if not gguf_files:
             raise FileNotFoundError(
                 f"No .gguf model found in {MODELS_DIR}. "
                 "Please run `python download_model.py` first to download a model."
             )
-        # Prefer the largest / most capable model file found
         gguf_files.sort(key=lambda p: p.stat().st_size, reverse=True)
         return gguf_files[0]
 
     def _load_model(self):
-        model_path = self._find_model_file()
-        self.model_filename = model_path.name
-        print(f"\n[ENGINE] Loading local GGUF model: {model_path.name}")
+        target_path = self._find_model_file()
+        self.model_path = target_path
+        self.model_filename = target_path.name
+        print(f"\n=======================================================")
+        print(f"[ENGINE] Loading local GGUF model: {target_path.name}")
+        print(f"[ENGINE] Size: {target_path.stat().st_size / (1024**3):.2f} GB")
         print(f"[ENGINE] Context: {N_CTX} tokens | CPU Threads: {N_THREADS} | GPU Layers: {N_GPU_LAYERS}")
+        print(f"=======================================================\n")
         
         self.llm = Llama(
-            model_path=str(model_path),
+            model_path=str(target_path),
             n_ctx=N_CTX,
             n_threads=N_THREADS,
             n_gpu_layers=N_GPU_LAYERS,
@@ -140,10 +156,18 @@ class LocalModelEngine:
         ))
         return "".join(tokens).strip()
 
-_engine_instance = None
+_engine_instance: Optional[LocalModelEngine] = None
 
-def get_engine() -> LocalModelEngine:
+def get_engine(model_path: Optional[Path] = None) -> LocalModelEngine:
     global _engine_instance
     if _engine_instance is None:
-        _engine_instance = LocalModelEngine()
+        _engine_instance = LocalModelEngine(model_path=model_path)
+    elif model_path and _engine_instance.model_path != model_path:
+        print(f"[ENGINE] Switching active model to: {model_path.name}")
+        _engine_instance = LocalModelEngine(model_path=model_path)
+    return _engine_instance
+
+def switch_model(model_path: Path) -> LocalModelEngine:
+    global _engine_instance
+    _engine_instance = LocalModelEngine(model_path=model_path)
     return _engine_instance

@@ -95,7 +95,7 @@ echo.
 echo [*] Starting WeatherGPT Local Server on port 8000...
 echo.
 
-python main.py
+python main.py %*
 
 if errorlevel 1 (
     echo.
