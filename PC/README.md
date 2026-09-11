@@ -58,6 +58,41 @@ python main.py
 
 ---
 
+---
+
+## 💬 Testing & Chatting Directly on PC
+
+You can test model responses directly on your PC using either the **Interactive Terminal CLI** or the **Web Browser Playground** without needing an Android device connected:
+
+### Option A: Interactive Terminal Chat (CLI)
+Double-click **`run_chat_cli.bat`** or run:
+```bash
+python chat_cli.py
+```
+- **Real-Time Token Streaming**: Streams answers token-by-token with live speed metrics (`tok/s`).
+- **Interactive Role Switching**:
+  - `/sector farmer` - Switch to Kisan / Agronomy mode
+  - `/sector disaster` - Switch to Disaster Command mode
+  - `/sector commuter` - Switch to Urban Travel mode
+  - `/sector aviation` - Switch to Flight / Drone mode
+- **Weather & Location Simulation**:
+  - `/weather Temp: 34°C, Humidity: 85%, Rain: Heavy`
+  - `/location Patna, Bihar`
+  - `/clear` - Reset conversation memory
+  - `/exit` - Quit
+- **Smart Memory Sharing**: Automatically connects to the running server on port 8000 to avoid loading duplicate model weights into RAM. If the server is offline, it runs the engine directly.
+
+### Option B: Web Browser Chat Playground
+Double-click **`open_web_chat.bat`** or navigate in your browser to:
+```
+http://localhost:8000/chat
+```
+- Modern frosted glass dark interface.
+- 1-click sector switcher buttons.
+- Live weather simulator sliders (Temperature, Humidity, Rain Alert presets).
+- Quick test prompts for instant benchmarking.
+- Token speedometers and real-time streaming response bubbles.
+
 ## 🔌 API Reference & Contracts
 
 ### 1. SSE Real-Time Chat Stream (Matching Android Contract)
